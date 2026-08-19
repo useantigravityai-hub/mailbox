@@ -1,6 +1,6 @@
 {
     "name": "eibs/laravel-gmail-mailbox",
-    "description": "A reusable Laravel package for Gmail API integration, OAuth authentication, Inbox UI, email details viewer, and message compose/reply.",
+    "description": "A reusable Laravel package for Gmail API integration, OAuth authentication, inbox UI, email details viewer, and message compose/reply.",
     "type": "library",
     "license": "MIT",
     "authors": [
@@ -9,10 +9,22 @@
             "email": "info@eibsglobal.com"
         }
     ],
+    "keywords": [
+        "laravel",
+        "gmail",
+        "gmail-api",
+        "google-api",
+        "google-oauth",
+        "mailbox",
+        "email",
+        "inbox",
+        "oauth",
+        "laravel-package"
+    ],
     "require": {
         "php": "^8.1",
         "illuminate/support": "^10.0|^11.0",
-        "google/apiclient": "^2.15|^2.19"
+        "google/apiclient": "^2.15"
     },
     "autoload": {
         "psr-4": {
@@ -26,6 +38,10 @@
             ]
         }
     },
-    "minimum-stability": "dev",
+    "support": {
+        "issues": "https://github.com/useantigravityai-hub/laravel-gmail-mailbox/issues",
+        "source": "https://github.com/useantigravityai-hub/laravel-gmail-mailbox"
+    },
+    "minimum-stability": "stable",
     "prefer-stable": true
 }
