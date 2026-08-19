@@ -38,10 +38,6 @@
             ]
         }
     },
-    "support": {
-        "issues": "https://github.com/useantigravityai-hub/laravel-gmail-mailbox/issues",
-        "source": "https://github.com/useantigravityai-hub/laravel-gmail-mailbox"
-    },
     "minimum-stability": "stable",
     "prefer-stable": true
 }
