@@ -1,37 +1,41 @@
 # Laravel Gmail Mailbox Package
 
-A reusable, plug-and-play Laravel package to integrate **Google Gmail API** into any Laravel application with a modern, responsive Gmail-like Mailbox UI.
+[![Latest Version on Packagist](https://img.shields.io/packagist/v/eibs/laravel-gmail-mailbox.svg?style=flat-square)](https://packagist.org/packages/eibs/laravel-gmail-mailbox)
+[![Total Downloads](https://img.shields.io/packagist/dt/eibs/laravel-gmail-mailbox.svg?style=flat-square)](https://packagist.org/packages/eibs/laravel-gmail-mailbox)
+[![License](https://img.shields.io/packagist/l/eibs/laravel-gmail-mailbox.svg?style=flat-square)](https://packagist.org/packages/eibs/laravel-gmail-mailbox)
+
+A complete, plug-and-play Laravel package to integrate the **Google Gmail API** into any Laravel application with a responsive, modern Gmail-like Mailbox UI, OAuth 2.0 authentication, email viewer, composer, and thread reply support.
 
 ---
 
-## Features
+## ✨ Features
 
-- **Google OAuth 2.0 Integration**: Automatic token exchange & offline refresh token handling.
-- **Modern Mailbox UI**: Responsive 2-column layout (Inbox / Sent lists, live search, unread badge pulse).
-- **Rich Email Viewer**: Sanitized HTML body display, inline image replacement, and attachment downloading/viewing.
-- **Compose & Reply Modal**: Send new emails and reply directly to threads with file attachments and CC/BCC support.
-- **Customizable & Extendable**: Publishable configuration, views, layout integration, and migrations.
-
----
-
-## Requirements
-
-- PHP `^8.1`
-- Laravel `10.x` or `11.x`
-- `google/apiclient: ^2.15|^2.19`
+- **Google OAuth 2.0 Authentication**: Seamless token authorization, automatic token expiration detection, and offline refresh token renewal.
+- **Modern Mailbox UI**: 2-column layout (Inbox, Sent, Drafts, Trash, Spam) with instant live search and real-time unread badges.
+- **Rich Email Viewer**: Sanitized HTML body display, inline base64/remote image rendering, and file attachments preview/downloading.
+- **Compose & Reply**: Send emails and reply to threads with attachments (support for CC/BCC).
+- **Zero-Config or Fully Customizable**: Works out of the box with zero setup, but allows full customization of layouts, blade views, middleware, route prefixes, and database migrations.
+- **Works With or Without Auth**: Runs smoothly in projects without authentication, with standard Laravel `auth`, or with custom guards/roles.
 
 ---
 
-## Installation
+## 📋 Requirements
 
-### 1. Require the Package via Composer
+- **PHP**: `^8.1`
+- **Laravel**: `10.x`, `11.x`, or `12.x`
+- **google/apiclient**: `^2.15`
 
-If hosted on Packagist:
+---
+
+## 🚀 Installation
+
+### 1. Install via Composer
+
 ```bash
-composer require queentech/laravel-gmail-mailbox
+composer require eibs/laravel-gmail-mailbox
 ```
 
-Or via local path repository in your application's `composer.json`:
+*(Optional: For local development repository, add this to your Laravel application's `composer.json`:)*
 ```json
 "repositories": [
     {
@@ -40,64 +44,197 @@ Or via local path repository in your application's `composer.json`:
     }
 ],
 "require": {
-    "queentech/laravel-gmail-mailbox": "@dev"
+    "eibs/laravel-gmail-mailbox": "@dev"
 }
 ```
 
-### 2. Publish Configuration & Migrations (Optional)
+---
 
-```bash
-# Publish configuration
-php artisan vendor:publish --tag=gmail-mailbox-config
+### 2. Run Database Migrations
 
-# Publish migrations
-php artisan vendor:publish --tag=gmail-mailbox-migrations
-
-# Publish views (if you want to customize the HTML)
-php artisan vendor:publish --tag=gmail-mailbox-views
-```
-
-### 3. Run Migrations
+The package automatically loads its migrations to create the `google_tokens` table:
 
 ```bash
 php artisan migrate
 ```
 
+*(Optional: Publish migrations if you wish to customize database columns)*
+```bash
+php artisan vendor:publish --tag=gmail-mailbox-migrations
+```
+
 ---
 
-## Configuration
+### 3. Publish Configuration (Optional)
 
-Add your Google Cloud credentials to your `.env` file:
+```bash
+php artisan vendor:publish --tag=gmail-mailbox-config
+```
+This creates `config/gmail-mailbox.php` where you can customize middleware, route prefix, master layout, and pagination.
+
+---
+
+## 🔑 Google Cloud Console Setup
+
+1. Visit the [Google Cloud Console](https://console.cloud.google.com/).
+2. Create a new project (or select an existing one).
+3. Navigate to **APIs & Services > Library**, search for **Gmail API**, and click **Enable**.
+4. Go to **APIs & Services > OAuth consent screen**:
+   - Select **External** (or Internal for Workspace organizations).
+   - Fill in App Name, User Support Email, and Developer Contact Email.
+   - Under **Scopes**, add the Gmail API scopes (`gmail.readonly`, `gmail.send`, `gmail.modify`).
+   - Under **Test Users**, add the Gmail address you will use to log in (if the app status is in *Testing* mode).
+5. Go to **APIs & Services > Credentials**:
+   - Click **Create Credentials > OAuth client ID**.
+   - Application type: **Web application**.
+   - **Authorized redirect URIs**:
+     ```
+     http://localhost:8000/gmail/callback
+     ```
+     *(Replace `http://localhost:8000` with your production `APP_URL` on live servers).*
+6. Copy your **Client ID** and **Client Secret** and paste them into your `.env` file.
+
+---
+
+## ⚙️ Configuration & Environment Variables
+
+Add the following variables to your `.env` file:
 
 ```env
 GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=your-google-client-secret
 GOOGLE_REDIRECT_URI="${APP_URL}/gmail/callback"
 
-# Optional customizations:
+# Optional UI & Routing Customizations:
 GMAIL_MAILBOX_PREFIX=gmail
-GMAIL_MAILBOX_LAYOUT=layouts/layoutMaster
+GMAIL_MAILBOX_LAYOUT=layouts.app
 GMAIL_MAILBOX_PER_PAGE=15
 ```
 
 ---
 
-## Routes Provided
+## 🔒 Authentication & Middleware Guide
 
-| Method | URI | Action | Name |
-|---|---|---|---|
-| `GET` | `/gmail/inbox` | Main Mailbox interface | `gmail.inbox` |
-| `GET` | `/gmail/settings` | Connect / Disconnect page | `gmail.settings` |
-| `GET` | `/gmail/auth` | Redirect to Google OAuth | `gmail.auth` |
-| `GET` | `/gmail/callback` | OAuth Redirect Callback | `gmail.callback` |
-| `GET` | `/gmail/email/{id}` | Email details view/json | `gmail.email.show` |
-| `POST`| `/gmail/send` | Send new email | `gmail.send` |
-| `POST`| `/gmail/reply/{id}` | Reply to thread | `gmail.reply` |
-| `GET` | `/gmail/attachment/{msgId}/{attId}` | Download attachment | `gmail.attachment.download` |
-| `GET` | `/gmail/unread-count` | Unread email count | `gmail.unread.count` |
+The package is designed to work seamlessly in both **unauthenticated** (standalone/public) and **authenticated** applications.
+
+### Case A: Projects WITHOUT Authentication (Default)
+By default, the package uses `['web']` middleware. You do not need Laravel Breeze, Jetstream, or any login system. Users can access the mailbox routes directly:
+- `http://localhost:8000/gmail/settings`
+- `http://localhost:8000/gmail/inbox`
+
+### Case B: Projects WITH Authentication (Laravel Breeze / Jetstream / Custom Auth)
+If your app has user authentication and you want to restrict the mailbox to logged-in users:
+
+1. Publish the config file:
+   ```bash
+   php artisan vendor:publish --tag=gmail-mailbox-config
+   ```
+2. Open `config/gmail-mailbox.php` and add `'auth'` to the middleware array:
+   ```php
+   'middleware' => ['web', 'auth'],
+   ```
+
+### Case C: Custom Roles or Guards (e.g., Admin only)
+You can use any custom middleware or role guard:
+```php
+'middleware' => ['web', 'auth:admin', 'role:super-admin'],
+```
 
 ---
 
-## License
+## 🎨 Customizing Layout & Blade Views
 
-The MIT License (MIT).
+### 1. Integrating into Your App's Master Layout
+The mailbox views extend the layout defined in `config/gmail-mailbox.php` or `GMAIL_MAILBOX_LAYOUT` in `.env`:
+
+```env
+# In your .env
+GMAIL_MAILBOX_LAYOUT=layouts.app
+```
+Or in `config/gmail-mailbox.php`:
+```php
+'layout' => env('GMAIL_MAILBOX_LAYOUT', 'layouts.app'),
+```
+*Your master layout should contain `@yield('content')` or standard Laravel content sections.*
+
+### 2. Customizing Blade Templates & UI
+To customize the HTML, CSS, or structure of the inbox, email reader, and settings page, publish the views:
+
+```bash
+php artisan vendor:publish --tag=gmail-mailbox-views
+```
+The views will be copied to `resources/views/vendor/gmail-mailbox/`:
+- `inbox.blade.php` — Main 2-column email list, search, compose modal, and reader.
+- `settings.blade.php` — Connect / Disconnect Google account page.
+
+---
+
+## 🚦 Available Routes
+
+| Method | URI | Route Name | Description |
+|---|---|---|---|
+| `GET` | `/gmail/inbox` | `gmail.inbox` | Main Gmail Mailbox interface |
+| `GET` | `/gmail/settings` | `gmail.settings` | Account connection & status screen |
+| `GET` | `/gmail/auth` | `gmail.auth` | Redirects to Google OAuth consent page |
+| `GET` | `/gmail/callback` | `gmail.callback` | Google OAuth redirect callback |
+| `GET` | `/gmail/email/{id}` | `gmail.email.show` | Fetch email details (JSON / View) |
+| `POST`| `/gmail/send` | `gmail.send` | Send a new email with attachments |
+| `POST`| `/gmail/reply/{id}` | `gmail.reply` | Reply to an existing email thread |
+| `POST`| `/gmail/read/{id}` | `gmail.read` | Mark an email as read |
+| `GET` | `/gmail/unread-count` | `gmail.unread.count` | Returns JSON with unread email count |
+| `GET` | `/gmail/attachment/{msgId}/{attId}` | `gmail.attachment.download` | Download attachment file |
+| `POST`| `/gmail/disconnect` | `gmail.disconnect` | Disconnect Google account and clear token |
+
+*(Note: If you change `GMAIL_MAILBOX_PREFIX=mail` in `.env`, the routes will be `/mail/inbox`, `/mail/settings`, etc.)*
+
+---
+
+## 💻 Programmatic Usage (`GmailService`)
+
+You can inject or resolve `Queen\GmailMailbox\Services\GmailService` to perform email operations anywhere in your application (Controllers, Commands, Jobs):
+
+```php
+use Queen\GmailMailbox\Services\GmailService;
+
+class ContactController extends Controller
+{
+    public function sendNotification(GmailService $gmailService)
+    {
+        // 1. Check if Gmail is connected
+        if (!$gmailService->isAuthenticated()) {
+            return response()->json(['error' => 'Gmail not connected'], 400);
+        }
+
+        // 2. Send an email
+        $result = $gmailService->sendEmail(
+            to: 'client@example.com',
+            subject: 'Project Update Notification',
+            body: '<h2>Hello!</h2><p>Your project update is ready for review.</p>',
+            cc: ['team@example.com'],
+            bcc: [],
+            attachments: [
+                request()->file('report_pdf') // UploadedFile instance or file path
+            ]
+        );
+
+        return response()->json(['success' => true, 'message' => 'Email sent!']);
+    }
+
+    public function fetchInbox(GmailService $gmailService)
+    {
+        // Fetch paginated messages
+        $messages = $gmailService->listMessages(folder: 'INBOX', maxResults: 15, pageToken: null, search: 'Invoice');
+
+        // Fetch single email with attachments
+        $email = $gmailService->getMessage($messages['messages'][0]['id']);
+
+        return response()->json($email);
+    }
+}
+```
+
+---
+
+## 📄 License
+
+This package is open-sourced software licensed under the [MIT license](LICENSE).
