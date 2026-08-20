@@ -5,7 +5,7 @@ use Queen\GmailMailbox\Http\Controllers\GmailMailboxController;
 use Queen\GmailMailbox\Http\Controllers\GmailSettingController;
 
 $prefix = config('gmail-mailbox.route_prefix', 'gmail');
-$middleware = config('gmail-mailbox.middleware', ['web', 'auth']);
+$middleware = config('gmail-mailbox.middleware', ['web']);
 
 Route::group(['prefix' => $prefix, 'middleware' => $middleware, 'as' => $prefix . '.'], function () {
     // OAuth and Authentication

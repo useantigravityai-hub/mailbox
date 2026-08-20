@@ -20,10 +20,11 @@ return [
     |--------------------------------------------------------------------------
     |
     | Define the base URL prefix and middleware stack for all package routes.
+    | To protect routes with authentication, add 'auth' to the array (e.g. ['web', 'auth']).
     |
     */
     'route_prefix' => env('GMAIL_MAILBOX_PREFIX', 'gmail'),
-    'middleware'   => ['web', 'auth'],
+    'middleware'   => ['web'],
 
     /*
     |--------------------------------------------------------------------------
