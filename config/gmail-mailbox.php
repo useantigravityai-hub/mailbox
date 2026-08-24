@@ -59,5 +59,7 @@ return [
         \Google\Service\Gmail::GMAIL_READONLY,
         \Google\Service\Gmail::GMAIL_SEND,
         \Google\Service\Gmail::GMAIL_MODIFY,
+        \Google\Service\Oauth2::USERINFO_EMAIL,
+        \Google\Service\Oauth2::USERINFO_PROFILE,
     ],
 ];

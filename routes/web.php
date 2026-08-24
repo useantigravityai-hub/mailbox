@@ -12,7 +12,8 @@ Route::group(['prefix' => $prefix, 'middleware' => $middleware, 'as' => $prefix 
     Route::get('/auth', [GmailSettingController::class, 'auth'])->name('auth');
     Route::get('/callback', [GmailSettingController::class, 'callback'])->name('callback');
     Route::get('/settings', [GmailSettingController::class, 'index'])->name('settings');
-    Route::post('/disconnect', [GmailSettingController::class, 'disconnect'])->name('disconnect');
+    Route::get('/switch/{id}', [GmailMailboxController::class, 'switchAccount'])->name('switch');
+    Route::post('/disconnect/{id?}', [GmailSettingController::class, 'disconnect'])->name('disconnect');
 
     // Mailbox Operations
     Route::get('/inbox', [GmailMailboxController::class, 'inbox'])->name('inbox');
@@ -22,4 +23,10 @@ Route::group(['prefix' => $prefix, 'middleware' => $middleware, 'as' => $prefix 
     Route::post('/read/{id}', [GmailMailboxController::class, 'markAsRead'])->name('read');
     Route::get('/unread-count', [GmailMailboxController::class, 'getUnreadCount'])->name('unread.count');
     Route::get('/attachment/{messageId}/{attachmentId}', [GmailMailboxController::class, 'downloadAttachment'])->name('attachment.download');
+
+    // Favorite Notifications
+    Route::post('/favorites/toggle', [GmailMailboxController::class, 'toggleFavorite'])->name('favorites.toggle');
+    Route::get('/favorites', [GmailMailboxController::class, 'getFavoritesList'])->name('favorites.list');
+    Route::delete('/favorites/{id}', [GmailMailboxController::class, 'removeFavorite'])->name('favorites.remove');
+    Route::get('/notifications/check', [GmailMailboxController::class, 'checkNotifications'])->name('notifications.check');
 });

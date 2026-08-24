@@ -6,6 +6,9 @@
     $colors = ['#1abc9c', '#3498db', '#9b59b6', '#34495e', '#f1c40f', '#e67e22', '#e74c3c', '#95a5a6'];
     $bgColor = $colors[ord($firstLetter) % count($colors)];
     $routePrefix = config('gmail-mailbox.route_prefix', 'gmail');
+
+    preg_match('/<([^>]+)>/', $rawFrom, $matches);
+    $extractedSenderEmail = strtolower(trim($matches[1] ?? (filter_var($rawFrom, FILTER_VALIDATE_EMAIL) ? $rawFrom : '')));
 @endphp
 
 <!-- Email Header -->
@@ -13,6 +16,13 @@
     <div class="d-flex justify-content-between align-items-start mb-3">
         <h5 class="text-dark fw-bold mb-0">{{ $email['subject'] ?: '(No Subject)' }}</h5>
         <div class="d-flex gap-2">
+            <!-- Favorite Notification Toggle -->
+            <button class="btn btn-sm btn-outline-warning d-flex align-items-center gap-1" id="detailFavBtn"
+                onclick="toggleFavoriteContact('{{ $extractedSenderEmail }}', '{{ addslashes($cleanName) }}', '{{ $email['id'] }}')">
+                <i class="mdi mdi-star-outline" id="detailFavIcon-{{ $email['id'] }}"></i>
+                <span>Watch Sender</span>
+            </button>
+
             <button class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1"
                 onclick="openMailModal('{{ addslashes($email['from']) }}', '{{ addslashes('Re: ' . preg_replace('/^Re:\s*/i', '', $email['subject'])) }}', '{{ $email['id'] }}', '{{ $email['threadId'] ?? '' }}')">
                 <i class="mdi mdi-reply"></i>

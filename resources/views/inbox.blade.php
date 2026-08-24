@@ -61,15 +61,26 @@
     <!-- Header -->
     <div class="col-lg-12">
         <div class="card card-action shadow-sm border-0">
-            <div class="card-header border-bottom py-3 d-flex justify-content-between align-items-center">
+            <div class="card-header border-bottom py-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <div class="d-flex align-items-center gap-2">
                     <i class="mdi mdi-email-outline text-primary fs-3"></i>
                     <h5 class="card-title mb-0 fw-bold">Mail Box</h5>
                 </div>
-                <div class="d-flex gap-2">
-                    <a href="{{ route(config('gmail-mailbox.route_prefix', 'gmail') . '.settings') }}" class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1">
+
+                <div class="d-flex align-items-center gap-2">
+                    <!-- Google Account Switcher -->
+                    @include('gmail-mailbox::partials.account_switcher')
+
+                    <!-- Favorite Notifications Trigger -->
+                    <button type="button" class="btn btn-sm btn-outline-warning d-flex align-items-center gap-1" onclick="openFavoriteModal()" title="Manage Favorite Notifications">
+                        <i class="mdi mdi-star"></i>
+                        <span class="d-none d-md-inline">Favorites</span>
+                        <span class="badge bg-warning text-dark rounded-pill px-1" id="headerFavBadge" style="font-size: 10px;">{{ count($favoritesList ?? []) }}</span>
+                    </button>
+
+                    <a href="{{ route(config('gmail-mailbox.route_prefix', 'gmail') . '.settings') }}" class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1" title="Settings">
                         <i class="mdi mdi-cog-outline"></i>
-                        <span>Settings</span>
+                        <span class="d-none d-md-inline">Settings</span>
                     </a>
                     <button type="button" class="btn btn-sm btn-primary fw-bold d-flex align-items-center gap-1" onclick="openMailModal()">
                         <i class="mdi mdi-plus"></i>
@@ -122,12 +133,19 @@
 <!-- Compose Modal -->
 @include('gmail-mailbox::partials.compose_modal')
 
+<!-- Favorite Notification Modal -->
+@include('gmail-mailbox::partials.favorite_modal')
+
+<!-- Live Toast Notifications Container -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3" id="favoriteToastContainer" style="z-index: 1090;"></div>
+
 @endsection
 
 @section('page-script')
 @parent
 <script>
     const routePrefix = "{{ config('gmail-mailbox.route_prefix', 'gmail') }}";
+    let favoriteEmailsList = @json($favoriteEmails ?? []);
 
     function showEmail(id) {
         const detailPanel = $('#emailDetailContent');
@@ -202,5 +220,302 @@
         $('#gmailSearchInput').val('');
         fetchSearchResults();
     }
+
+    // ==========================================
+    // ⭐ FAVORITE MAIL NOTIFICATION SYSTEM
+    // ==========================================
+
+    function toggleFavoriteContact(email, name, mailId) {
+        if (!email) {
+            alert('Could not determine contact email address.');
+            return;
+        }
+
+        $.ajax({
+            url: `/${routePrefix}/favorites/toggle`,
+            type: 'POST',
+            data: {
+                _token: '{{ csrf_token() }}',
+                email: email,
+                name: name,
+                notify_incoming: true,
+                notify_outgoing: true
+            },
+            success: function(res) {
+                if (res.status) {
+                    const isFav = res.is_favorite;
+                    
+                    // Update cache array
+                    if (isFav) {
+                        if (!favoriteEmailsList.includes(email.toLowerCase())) {
+                            favoriteEmailsList.push(email.toLowerCase());
+                        }
+                    } else {
+                        favoriteEmailsList = favoriteEmailsList.filter(e => e !== email.toLowerCase());
+                    }
+
+                    // Update Star icon in row
+                    if (mailId) {
+                        const starIcon = $(`#fav-star-${mailId}`);
+                        const row = $(`#mail-row-${mailId}`);
+                        if (isFav) {
+                            starIcon.removeClass('mdi-star-outline text-muted').addClass('mdi-star text-warning');
+                            row.addClass('border-start border-3 border-warning');
+                        } else {
+                            starIcon.removeClass('mdi-star text-warning').addClass('mdi-star-outline text-muted');
+                            row.removeClass('border-start border-3 border-warning');
+                        }
+                    }
+
+                    // Request desktop notifications if granted
+                    if (isFav && 'Notification' in window && Notification.permission === 'default') {
+                        Notification.requestPermission();
+                    }
+
+                    // Update header badge
+                    $('#headerFavBadge').text(favoriteEmailsList.length);
+                }
+            },
+            error: function() {
+                alert('Failed to update favorite status.');
+            }
+        });
+    }
+
+    function openFavoriteModal() {
+        $('#favoriteNotificationModal').modal('show');
+        checkNotificationPermissionStatus();
+        fetchFavoritesListModal();
+    }
+
+    function checkNotificationPermissionStatus() {
+        if ('Notification' in window) {
+            if (Notification.permission === 'default') {
+                $('#browserPermBanner').removeClass('d-none');
+            } else {
+                $('#browserPermBanner').addClass('d-none');
+            }
+        }
+    }
+
+    function requestDesktopPermission() {
+        if ('Notification' in window) {
+            Notification.requestPermission().then(function(perm) {
+                checkNotificationPermissionStatus();
+                if (perm === 'granted') {
+                    playNotificationChime();
+                    new Notification('Favorite Mail Notifications Enabled', {
+                        body: 'You will receive desktop alerts when your watched contacts send or receive emails.',
+                        icon: 'https://cdn-icons-png.flaticon.com/512/281/281769.png'
+                    });
+                }
+            });
+        }
+    }
+
+    function fetchFavoritesListModal() {
+        const container = $('#favoritesListContainer');
+        $.ajax({
+            url: `/${routePrefix}/favorites`,
+            type: 'GET',
+            success: function(res) {
+                if (res.status) {
+                    const list = res.favorites || [];
+                    $('#favCountBadge').text(`${list.length} contact${list.length === 1 ? '' : 's'}`);
+                    $('#headerFavBadge').text(list.length);
+
+                    if (list.length === 0) {
+                        container.html(`
+                            <div class="text-center text-muted py-4">
+                                <i class="mdi mdi-star-off-outline display-4 opacity-25"></i>
+                                <p class="small mt-2 mb-0">No favorite contacts watched yet.<br>Add an email above or star messages in your inbox.</p>
+                            </div>
+                        `);
+                        return;
+                    }
+
+                    let html = '<div class="list-group list-group-flush">';
+                    list.forEach(item => {
+                        html += `
+                            <div class="list-group-item d-flex align-items-center justify-content-between px-2 py-2">
+                                <div class="d-flex align-items-center gap-2 min-w-0">
+                                    <i class="mdi mdi-star text-warning fs-5"></i>
+                                    <div class="text-truncate">
+                                        <div class="fw-semibold text-dark small text-truncate">${item.name || item.email}</div>
+                                        <div class="text-muted" style="font-size: 11px;">${item.email}</div>
+                                    </div>
+                                </div>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="badge bg-label-info" style="font-size: 10px;">
+                                        ${item.notify_incoming ? 'In ' : ''}${item.notify_outgoing ? 'Out' : ''}
+                                    </span>
+                                    <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-2" onclick="removeFavoriteContact(${item.id})" title="Remove">
+                                        <i class="mdi mdi-trash-can-outline fs-5"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    html += '</div>';
+                    container.html(html);
+                }
+            }
+        });
+    }
+
+    function submitAddFavorite() {
+        const email = $('#new_fav_email').val();
+        const name = $('#new_fav_name').val();
+        const notifyIn = $('#fav_notify_in').is(':checked');
+        const notifyOut = $('#fav_notify_out').is(':checked');
+
+        if (!email) return;
+
+        $.ajax({
+            url: `/${routePrefix}/favorites/toggle`,
+            type: 'POST',
+            data: {
+                _token: '{{ csrf_token() }}',
+                email: email,
+                name: name,
+                notify_incoming: notifyIn,
+                notify_outgoing: notifyOut
+            },
+            success: function(res) {
+                $('#new_fav_email').val('');
+                $('#new_fav_name').val('');
+                fetchFavoritesListModal();
+                fetchSearchResults();
+            }
+        });
+    }
+
+    function removeFavoriteContact(id) {
+        $.ajax({
+            url: `/${routePrefix}/favorites/${id}`,
+            type: 'DELETE',
+            data: { _token: '{{ csrf_token() }}' },
+            success: function() {
+                fetchFavoritesListModal();
+                fetchSearchResults();
+            }
+        });
+    }
+
+    // Sound chime generator using HTML5 Web Audio API
+    function playNotificationChime() {
+        try {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContext) return;
+            const ctx = new AudioContext();
+
+            // Tone 1
+            const osc1 = ctx.createOscillator();
+            const gain1 = ctx.createGain();
+            osc1.type = 'sine';
+            osc1.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+            gain1.gain.setValueAtTime(0.15, ctx.currentTime);
+            gain1.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+            osc1.connect(gain1);
+            gain1.connect(ctx.destination);
+            osc1.start();
+            osc1.stop(ctx.currentTime + 0.35);
+
+            // Tone 2 (Harmonic high chime)
+            setTimeout(() => {
+                const osc2 = ctx.createOscillator();
+                const gain2 = ctx.createGain();
+                osc2.type = 'sine';
+                osc2.frequency.setValueAtTime(880.00, ctx.currentTime); // A5
+                gain2.gain.setValueAtTime(0.2, ctx.currentTime);
+                gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+                osc2.connect(gain2);
+                gain2.connect(ctx.destination);
+                osc2.start();
+                osc2.stop(ctx.currentTime + 0.5);
+            }, 120);
+        } catch (e) {
+            // Audio context failed or blocked by browser policy
+        }
+    }
+
+    // In-App Toast + Desktop Notification Trigger
+    function triggerNotification(notif) {
+        // 1. Play melodic chime
+        playNotificationChime();
+
+        // 2. Browser Desktop Notification
+        if ('Notification' in window && Notification.permission === 'granted') {
+            const title = notif.type === 'incoming' 
+                ? `⭐ Favorite Mail from ${notif.contact || notif.email}`
+                : `📤 Email Sent to ${notif.contact || notif.email}`;
+
+            const desktopNotif = new Notification(title, {
+                body: `${notif.subject}\n${notif.snippet || ''}`,
+                icon: 'https://cdn-icons-png.flaticon.com/512/281/281769.png'
+            });
+
+            desktopNotif.onclick = function() {
+                window.focus();
+                showEmail(notif.id);
+            };
+        }
+
+        // 3. In-App Floating Toast Alert
+        const toastId = 'toast-' + notif.id + '-' + Date.now();
+        const typeBadge = notif.type === 'incoming' 
+            ? '<span class="badge bg-warning text-dark">⭐ Priority Incoming</span>'
+            : '<span class="badge bg-info">📤 Sent Out</span>';
+
+        const toastHtml = `
+            <div id="${toastId}" class="toast align-items-center text-dark bg-white border-warning shadow-lg show mb-2" role="alert" aria-live="assertive" aria-atomic="true" style="border-left: 5px solid #ffab00; border-radius: 12px;">
+                <div class="toast-header bg-warning bg-opacity-10 text-dark border-bottom-0 py-2">
+                    <i class="mdi mdi-star text-warning me-2 fs-5"></i>
+                    <strong class="me-auto text-truncate" style="max-width: 170px;">${notif.contact || notif.email}</strong>
+                    ${typeBadge}
+                    <button type="button" class="btn-close ms-2" data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>
+                <div class="toast-body py-2">
+                    <div class="fw-bold text-truncate small mb-1">${notif.subject}</div>
+                    <div class="text-muted small text-truncate mb-2" style="font-size: 11px;">${notif.snippet || ''}</div>
+                    <div class="d-flex justify-content-end gap-1">
+                        <button type="button" class="btn btn-xs btn-primary px-3" onclick="showEmail('${notif.id}'); $('#${toastId}').remove();">
+                            <i class="mdi mdi-email-open-outline me-1"></i> View Mail
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        $('#favoriteToastContainer').append(toastHtml);
+
+        // Auto remove toast after 10s
+        setTimeout(() => {
+            $(`#${toastId}`).fadeOut(300, function() { $(this).remove(); });
+        }, 10000);
+    }
+
+    // Polling background worker (every 25 seconds)
+    function startFavoriteNotificationPolling() {
+        setInterval(function() {
+            $.ajax({
+                url: `/${routePrefix}/notifications/check`,
+                type: 'GET',
+                success: function(res) {
+                    if (res.status && res.notifications && res.notifications.length > 0) {
+                        res.notifications.forEach(notif => {
+                            triggerNotification(notif);
+                        });
+                        // Refresh inbox list seamlessly
+                        fetchSearchResults();
+                    }
+                }
+            });
+        }, 25000);
+    }
+
+    $(document).ready(function() {
+        startFavoriteNotificationPolling();
+    });
 </script>
 @endsection

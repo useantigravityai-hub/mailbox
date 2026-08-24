@@ -43,6 +43,10 @@ class GmailMailboxController extends Controller
                 'sentPageToken'      => $sentToken,
                 'tab'                => $tab,
                 'search'             => $search,
+                'activeAccount'      => $this->gmailService->getActiveAccount(),
+                'connectedAccounts'  => $this->gmailService->getAllAccounts(),
+                'favoriteEmails'     => $this->gmailService->getFavoriteEmails(),
+                'favoritesList'      => $this->gmailService->getFavoritesList(),
             ];
 
             if ($request->ajax()) {
@@ -53,8 +57,23 @@ class GmailMailboxController extends Controller
         } catch (\Exception $e) {
             Log::error('Gmail Mailbox Load Error: ' . $e->getMessage());
             return redirect()->route(config('gmail-mailbox.route_prefix', 'gmail') . '.auth')
-                ->with('error', 'Session expired. Please reconnect your Google Account.');
+                ->with('error', 'Session expired or error loading account. Please reconnect.');
         }
+    }
+
+    /**
+     * Switch active email account
+     */
+    public function switchAccount(Request $request, $id)
+    {
+        $switched = $this->gmailService->switchAccount((int) $id);
+
+        if ($switched) {
+            return redirect()->route(config('gmail-mailbox.route_prefix', 'gmail') . '.inbox')
+                ->with('success', 'Switched account successfully.');
+        }
+
+        return redirect()->back()->with('error', 'Account not found.');
     }
 
     /**
@@ -196,15 +215,59 @@ class GmailMailboxController extends Controller
     }
 
     /**
-     * Get live count of unread emails
+     * Toggle favorite notification for an email address
      */
-    public function getUnreadCount()
+    public function toggleFavorite(Request $request)
+    {
+        $email = $request->input('email');
+        $name = $request->input('name');
+        $notifyIncoming = $request->boolean('notify_incoming', true);
+        $notifyOutgoing = $request->boolean('notify_outgoing', true);
+
+        if (!$email) {
+            return response()->json(['status' => false, 'message' => 'Email address is required.'], 422);
+        }
+
+        $result = $this->gmailService->toggleFavorite($email, $name, $notifyIncoming, $notifyOutgoing);
+        return response()->json($result);
+    }
+
+    /**
+     * Get list of all favorite notification contacts
+     */
+    public function getFavoritesList()
     {
         try {
-            $count = $this->gmailService->getUnreadCount();
-            return response()->json(['status' => true, 'count' => $count]);
+            $favorites = $this->gmailService->getFavoritesList();
+            return response()->json(['status' => true, 'favorites' => $favorites]);
         } catch (\Exception $e) {
-            return response()->json(['status' => false, 'count' => 0]);
+            return response()->json(['status' => false, 'favorites' => []], 500);
+        }
+    }
+
+    /**
+     * Remove a favorite contact by ID
+     */
+    public function removeFavorite($id)
+    {
+        $deleted = $this->gmailService->removeFavorite((int) $id);
+        return response()->json(['status' => $deleted, 'message' => $deleted ? 'Removed from favorites' : 'Not found']);
+    }
+
+    /**
+     * AJAX polling endpoint to check for favorite contact email activity
+     */
+    public function checkNotifications()
+    {
+        try {
+            $notifications = $this->gmailService->checkFavoriteNotifications();
+            return response()->json([
+                'status'        => true,
+                'count'         => count($notifications),
+                'notifications' => $notifications,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['status' => false, 'count' => 0, 'notifications' => []]);
         }
     }
 }

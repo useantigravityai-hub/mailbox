@@ -11,14 +11,17 @@ return new class extends Migration
      */
     public function up(): void
     {
-        if (!Schema::hasTable('google_tokens')) {
-            Schema::create('google_tokens', function (Blueprint $table) {
+        if (!Schema::hasTable('gmail_favorites')) {
+            Schema::create('gmail_favorites', function (Blueprint $table) {
                 $table->id();
                 $table->unsignedBigInteger('user_id')->nullable()->index();
-                $table->string('email')->nullable()->index();
+                $table->unsignedBigInteger('account_id')->nullable()->index();
+                $table->string('email')->index();
                 $table->string('name')->nullable();
-                $table->string('avatar', 500)->nullable();
-                $table->json('token');
+                $table->boolean('notify_incoming')->default(true);
+                $table->boolean('notify_outgoing')->default(true);
+                $table->timestamp('last_notified_at')->nullable();
+                $table->string('last_message_id')->nullable();
                 $table->timestamps();
             });
         }
@@ -29,6 +32,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('google_tokens');
+        Schema::dropIfExists('gmail_favorites');
     }
 };

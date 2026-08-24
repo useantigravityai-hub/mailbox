@@ -10,8 +10,10 @@ A complete, plug-and-play Laravel package to integrate the **Google Gmail API** 
 
 ## ✨ Features
 
-- **Google OAuth 2.0 Authentication**: Seamless token authorization, automatic token expiration detection, and offline refresh token renewal.
-- **Modern Mailbox UI**: 2-column layout (Inbox, Sent, Drafts, Trash, Spam) with instant live search and real-time unread badges.
+- **Multi-Account Mail Switcher**: Connect multiple Gmail and Google Workspace accounts with a native Gmail-style profile dropdown switcher. Seamlessly toggle active mailboxes in real-time.
+- **Favorite / VIP Mail Notifications**: Mark specific emails, contacts, or senders as Favorites (⭐). Get instant browser desktop notifications, sound chimes, and rich in-app toast alerts when priority emails arrive or are sent.
+- **Google OAuth 2.0 Authentication**: Seamless token authorization, profile metadata syncing (name, email, avatar), automatic token expiration detection, and offline refresh token renewal.
+- **Modern Mailbox UI**: 2-column layout (Inbox, Sent) with instant live search, pagination, and real-time unread badges.
 - **Rich Email Viewer**: Sanitized HTML body display, inline base64/remote image rendering, and file attachments preview/downloading.
 - **Compose & Reply**: Send emails and reply to threads with attachments (support for CC/BCC).
 - **Zero-Config or Fully Customizable**: Works out of the box with zero setup, but allows full customization of layouts, blade views, middleware, route prefixes, and database migrations.
@@ -174,16 +176,21 @@ The views will be copied to `resources/views/vendor/gmail-mailbox/`:
 | Method | URI | Route Name | Description |
 |---|---|---|---|
 | `GET` | `/gmail/inbox` | `gmail.inbox` | Main Gmail Mailbox interface |
-| `GET` | `/gmail/settings` | `gmail.settings` | Account connection & status screen |
-| `GET` | `/gmail/auth` | `gmail.auth` | Redirects to Google OAuth consent page |
+| `GET` | `/gmail/settings` | `gmail.settings` | Account management & status screen |
+| `GET` | `/gmail/auth` | `gmail.auth` | Redirects to Google OAuth consent page (with account chooser) |
 | `GET` | `/gmail/callback` | `gmail.callback` | Google OAuth redirect callback |
+| `GET` | `/gmail/switch/{id}` | `gmail.switch` | Switch active Gmail mailbox account |
+| `POST`| `/gmail/disconnect/{id?}` | `gmail.disconnect` | Disconnect specific or active Google account |
 | `GET` | `/gmail/email/{id}` | `gmail.email.show` | Fetch email details (JSON / View) |
 | `POST`| `/gmail/send` | `gmail.send` | Send a new email with attachments |
 | `POST`| `/gmail/reply/{id}` | `gmail.reply` | Reply to an existing email thread |
 | `POST`| `/gmail/read/{id}` | `gmail.read` | Mark an email as read |
 | `GET` | `/gmail/unread-count` | `gmail.unread.count` | Returns JSON with unread email count |
 | `GET` | `/gmail/attachment/{msgId}/{attId}` | `gmail.attachment.download` | Download attachment file |
-| `POST`| `/gmail/disconnect` | `gmail.disconnect` | Disconnect Google account and clear token |
+| `POST`| `/gmail/favorites/toggle` | `gmail.favorites.toggle` | Toggle favorite / watched contact for notifications |
+| `GET` | `/gmail/favorites` | `gmail.favorites.list` | List all active favorite notification contacts |
+| `DELETE`| `/gmail/favorites/{id}` | `gmail.favorites.remove` | Remove a watched favorite contact |
+| `GET` | `/gmail/notifications/check` | `gmail.notifications.check` | Polling endpoint for favorite mail activity |
 
 *(Note: If you change `GMAIL_MAILBOX_PREFIX=mail` in `.env`, the routes will be `/mail/inbox`, `/mail/settings`, etc.)*
 
@@ -191,44 +198,38 @@ The views will be copied to `resources/views/vendor/gmail-mailbox/`:
 
 ## 💻 Programmatic Usage (`GmailService`)
 
-You can inject or resolve `Queen\GmailMailbox\Services\GmailService` to perform email operations anywhere in your application (Controllers, Commands, Jobs):
+You can inject or resolve `Queen\GmailMailbox\Services\GmailService` to perform email and multi-account operations anywhere in your application:
 
 ```php
 use Queen\GmailMailbox\Services\GmailService;
 
-class ContactController extends Controller
+class MailboxController extends Controller
 {
-    public function sendNotification(GmailService $gmailService)
+    public function index(GmailService $gmailService)
     {
         // 1. Check if Gmail is connected
         if (!$gmailService->isAuthenticated()) {
-            return response()->json(['error' => 'Gmail not connected'], 400);
+            return redirect()->route('gmail.auth');
         }
 
-        // 2. Send an email
+        // 2. Get active and connected accounts
+        $activeAccount = $gmailService->getActiveAccount(); // GoogleToken model
+        $allAccounts   = $gmailService->getAllAccounts();
+
+        // 3. Switch active account programmatically
+        $gmailService->switchAccount($accountId);
+
+        // 4. Send an email from active account
         $result = $gmailService->sendEmail(
             to: 'client@example.com',
             subject: 'Project Update Notification',
             body: '<h2>Hello!</h2><p>Your project update is ready for review.</p>',
-            cc: ['team@example.com'],
-            bcc: [],
             attachments: [
-                request()->file('report_pdf') // UploadedFile instance or file path
+                ['path' => storage_path('app/invoice.pdf'), 'name' => 'Invoice.pdf']
             ]
         );
 
         return response()->json(['success' => true, 'message' => 'Email sent!']);
-    }
-
-    public function fetchInbox(GmailService $gmailService)
-    {
-        // Fetch paginated messages
-        $messages = $gmailService->listMessages(folder: 'INBOX', maxResults: 15, pageToken: null, search: 'Invoice');
-
-        // Fetch single email with attachments
-        $email = $gmailService->getMessage($messages['messages'][0]['id']);
-
-        return response()->json($email);
     }
 }
 ```

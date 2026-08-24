@@ -75,13 +75,25 @@
             if (!$cleanName) $cleanName = 'U';
             $firstLetter = strtoupper(substr($cleanName, 0, 1));
             $bgColor = $colors[ord($firstLetter) % count($colors)];
+
+            // Extract email address for favorite matching
+            preg_match('/<([^>]+)>/', $rawName, $matches);
+            $extractedEmail = strtolower(trim($matches[1] ?? (filter_var($rawName, FILTER_VALIDATE_EMAIL) ? $rawName : '')));
+            $isFavorite = !empty($extractedEmail) && in_array($extractedEmail, $favoriteEmails ?? []);
         @endphp
 
-        <div class="p-2 border-bottom mail-row rounded mb-1" id="mail-row-{{ $email['id'] }}" onclick="showEmail('{{ $email['id'] }}')">
+        <div class="p-2 border-bottom mail-row rounded mb-1 {{ $isFavorite ? 'border-start border-3 border-warning' : '' }}" id="mail-row-{{ $email['id'] }}" onclick="showEmail('{{ $email['id'] }}')">
             <div class="d-flex align-items-start gap-2">
+                <!-- Star Favorite Button -->
+                <button type="button" class="btn btn-link p-0 text-decoration-none border-0 flex-shrink-0 mt-1" 
+                        onclick="event.stopPropagation(); toggleFavoriteContact('{{ $extractedEmail }}', '{{ addslashes($cleanName) }}', '{{ $email['id'] }}')" 
+                        title="{{ $isFavorite ? 'Remove from favorite notifications' : 'Add to favorite notifications' }}">
+                    <i class="mdi {{ $isFavorite ? 'mdi-star text-warning' : 'mdi-star-outline text-muted' }} fs-5" id="fav-star-{{ $email['id'] }}"></i>
+                </button>
+
                 <!-- Avatar -->
                 <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold shadow-sm flex-shrink-0"
-                    style="width: 38px; height: 38px; background-color: {{ $bgColor }}; font-size: 15px;">
+                    style="width: 34px; height: 34px; background-color: {{ $bgColor }}; font-size: 14px;">
                     {{ $firstLetter }}
                 </div>
 
@@ -89,8 +101,11 @@
                 <div class="flex-grow-1 min-w-0" style="overflow: hidden;">
                     <div class="d-flex justify-content-between align-items-baseline">
                         <span class="text-truncate text-dark {{ !empty($email['is_unread']) ? 'fw-bold' : 'fw-medium' }}" 
-                              style="max-width: 170px; font-size: 13px;" id="mail-from-{{ $email['id'] }}">
+                              style="max-width: 155px; font-size: 13px;" id="mail-from-{{ $email['id'] }}">
                             {{ $cleanName }}
+                            @if($isFavorite)
+                                <i class="mdi mdi-bell-ring-outline text-warning ms-1" style="font-size: 12px;" title="Watched Favorite Contact"></i>
+                            @endif
                         </span>
                         <small class="text-muted" style="font-size: 11px;">
                             {{ !empty($email['date']) ? date('M d', strtotime($email['date'])) : '' }}
